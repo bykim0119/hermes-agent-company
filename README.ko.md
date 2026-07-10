@@ -1,6 +1,9 @@
 # hermes-agent-company
 
-*[English](README.md) · 한국어*
+<p align="center">
+  <a href="README.md"><img src="https://img.shields.io/badge/Lang-English-lightgrey?style=for-the-badge" alt="English"></a>
+  <a href="README.ko.md"><img src="https://img.shields.io/badge/Lang-한국어-2ea44f?style=for-the-badge" alt="한국어"></a>
+</p>
 
 백그라운드 위임(delegation)을 **역할별로 특화된 서브에이전트들의 작은 회사**로
 바꿔 주는 [Hermes](https://github.com/NousResearch/hermes-agent) 플러그인입니다 —
