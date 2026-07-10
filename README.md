@@ -1,5 +1,7 @@
 # hermes-agent-company
 
+*English · [한국어](README.ko.md)*
+
 A [Hermes](https://github.com/NousResearch/hermes-agent) plugin that turns
 background delegation into a small **company of role-specialized sub-agents** —
 *planner, coder, tester, reviewer* — coordinated by the main agent. Coding-heavy
