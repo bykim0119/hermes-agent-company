@@ -1,6 +1,9 @@
 # hermes-agent-company
 
-*English · [한국어](README.ko.md)*
+<p align="center">
+  <a href="README.md"><img src="https://img.shields.io/badge/Lang-English-2ea44f?style=for-the-badge" alt="English"></a>
+  <a href="README.ko.md"><img src="https://img.shields.io/badge/Lang-한국어-lightgrey?style=for-the-badge" alt="한국어"></a>
+</p>
 
 A [Hermes](https://github.com/NousResearch/hermes-agent) plugin that turns
 background delegation into a small **company of role-specialized sub-agents** —
