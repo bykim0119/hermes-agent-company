@@ -106,8 +106,12 @@ async def create_coder_thread(
         from .roles import get_role
         _rec = _db.get_coder_run(coder_run_id)
         _label = get_role(_rec.get("role") if _rec else None).result_label
+        # 취소 방법을 앵커에 같이 적는다. 안 적어두면 사용자가 자연스럽게
+        # 떠오르는 말을 치는데, 인식 못 한 말은 취소가 아니라 코더에게 가는
+        # 지시가 되어 "멈췄습니다" 같은 거짓 확인을 만들어낸다.
         anchor = await channel.send(
-            f"▶ 서브에이전트에게 위임 · {_label} — `{coder_run_id}`"
+            f"▶ 서브에이전트에게 위임 · {_label} — `{coder_run_id}`\n"
+            f"· 멈추려면 이 스레드에 `그만`"
         )
         thread_name = self._make_thread_name(goal)
         thread = await anchor.create_thread(
@@ -589,6 +593,12 @@ def install_discord_coder_overlay() -> None:
     #    to that coder (cancel / follow-up) instead of the main Hermes brain.
     #    on_message is the sole caller and its channel filters run before it
     #    reaches here, so ordering is preserved.
+    #
+    #    hermes >=0.19 returns bool ("did this reach dispatch?"); the missed-
+    #    message recovery sweep re-delivers anything falsy. A coder-routed
+    #    message *was* dispatched — to the coder — so return True, or a
+    #    gateway restart replays follow-ups. Older hermes returns None and
+    #    ignores the value, so True is safe there too.
     _orig_handle_message = DiscordAdapter._handle_message
 
     async def _wrapped_handle_message(self, message, *args, **kwargs):
@@ -599,12 +609,12 @@ def install_discord_coder_overlay() -> None:
                 from .delegate_background import is_cancel_command
                 if is_cancel_command(message.content):
                     await self._cancel_coder_run(_cid, message.channel)
-                    return
+                    return True
                 sessions.touch(_cid)
                 await self._handle_coder_followup(
                     _cid, message.content, message.channel
                 )
-                return
+                return True
         return await _orig_handle_message(self, message, *args, **kwargs)
 
     DiscordAdapter._handle_message = _wrapped_handle_message

@@ -188,7 +188,19 @@ def claim_completion_notify(coder_run_id: str) -> Optional[Dict[str, Any]]:
 # Bang-prefixed control tokens. A bare ``cancel`` is rejected by
 # ``is_cancel_command`` because such a word can legitimately appear in a
 # follow-up instruction; the prefix marks an explicit gateway command.
-_CODER_CANCEL_COMMANDS = frozenset({"!cancel", "!stop"})
+_CODER_CANCEL_COMMANDS = frozenset({
+    # Bang forms — the original vocabulary, kept for anyone used to them.
+    "!cancel", "!stop",
+    # Bare forms — what the README has always documented, and what people
+    # actually type. Missing these caused a false "I stopped" confirmation:
+    # the word fell through to the coder as an *instruction*, a second run
+    # answered "stopped, no files changed", and the original run kept going
+    # and wrote files anyway.
+    "cancel", "stop",
+    # Korean — the operator writes Korean, so these are the likeliest words
+    # of all.
+    "그만", "멈춰", "중단", "취소",
+})
 
 
 def is_cancel_command(text: Optional[str]) -> bool:
@@ -196,6 +208,12 @@ def is_cancel_command(text: Optional[str]) -> bool:
 
     Used by the Discord adapter's thread message router to short-circuit
     follow-up forwarding when the user wants to terminate the run.
+
+    Matching is whole-message only: "stop" cancels, "stop the dev server"
+    is a genuine follow-up and goes to the coder untouched. Anything not
+    recognized here is forwarded as an instruction, so a missing word does
+    not merely fail to cancel — it silently becomes something the coder
+    will try to act on.
     """
     if not text:
         return False

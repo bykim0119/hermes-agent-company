@@ -238,8 +238,11 @@ def test_handle_message_routes_followup(monkeypatch):
         "agent_company.delegate_background.is_cancel_command",
         return_value=False,
     ):
-        asyncio.run(adapter._handle_message(message))
+        result = asyncio.run(adapter._handle_message(message))
 
+    # 0.19 회귀 가드: 반환값이 dispatch 도달 여부다. 코더로 라우팅한 것도
+    # dispatch이므로 True여야 한다 (아래 test_..._returns_true_for_recovery 참고).
+    assert result is True
     adapter._handle_coder_followup.assert_awaited_once_with(
         "coder-1", "keep going please", channel
     )
@@ -265,8 +268,9 @@ def test_handle_message_routes_cancel(monkeypatch):
         "agent_company.delegate_background.is_cancel_command",
         return_value=True,
     ):
-        asyncio.run(adapter._handle_message(message))
+        result = asyncio.run(adapter._handle_message(message))
 
+    assert result is True  # 0.19 회귀 가드 — 취소도 dispatch로 친다
     adapter._cancel_coder_run.assert_awaited_once_with("coder-9", channel)
     adapter._handle_coder_followup.assert_not_awaited()
     assert not hasattr(adapter, "handled")
@@ -323,6 +327,56 @@ def test_handle_message_forwards_extra_kwargs(monkeypatch):
     )
     assert result == "orig_handle"
     assert adapter.handle_kwargs.get("role_authorized") is True
+
+
+def test_handle_message_forwards_recovered_kwarg(monkeypatch):
+    """0.19 회귀 가드: 놓친 메시지 복구 경로가 ``recovered=True``(keyword-only)로
+    호출한다(0.18엔 없던 인자). wrapper가 이걸 orig로 그대로 넘겨야 한다."""
+    cls = _install_on(_make_stub_adapter_cls(), monkeypatch)
+    adapter = cls()
+    adapter._sessions = MagicMock()
+
+    _make_thread_channel(monkeypatch)
+    message = MagicMock()
+    message.channel = object()  # Thread 아님 → orig로 fall through
+    message.content = "hi"
+
+    result = asyncio.run(
+        adapter._handle_message(message, role_authorized=True, recovered=True)
+    )
+    assert result == "orig_handle"
+    assert adapter.handle_kwargs.get("recovered") is True
+
+
+def test_handle_message_returns_true_for_recovery(monkeypatch):
+    """0.19 회귀 가드 — 이게 이번 포팅의 핵심이다.
+
+    0.19의 ``_handle_message``는 bool(=dispatch에 도달했나)을 돌려주고,
+    놓친 메시지 복구 스윕(``recovered=True``)이 거짓인 메시지를 다시 배달한다.
+    코더 스레드로 가로챈 메시지가 None(거짓)을 돌려주면, 게이트웨이 재시작 뒤
+    같은 후속 지시가 코더에게 한 번 더 들어간다."""
+    cls = _install_on(_make_stub_adapter_cls(), monkeypatch)
+    adapter = cls()
+    adapter._sessions = MagicMock()
+    adapter._sessions.get_coder_by_thread.return_value = "coder-7"
+    adapter._handle_coder_followup = AsyncMock()
+    adapter._cancel_coder_run = AsyncMock()
+
+    channel = _make_thread_channel(monkeypatch)
+    message = MagicMock()
+    message.channel = channel
+    message.content = "one more thing"
+
+    with patch(
+        "agent_company.delegate_background.is_cancel_command",
+        return_value=False,
+    ):
+        result = asyncio.run(
+            adapter._handle_message(message, role_authorized=True, recovered=True)
+        )
+
+    assert result is True, "코더로 라우팅한 메시지가 복구 스윕에서 재배달된다"
+    assert not hasattr(adapter, "handled")  # orig로 흘러가지 않았다
 
 
 # --- _register_slash_commands wrap (/code) -----------------------------------

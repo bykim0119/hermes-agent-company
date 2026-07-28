@@ -50,7 +50,7 @@ the workspace.
 - **Discord overlay** — `/code <task>` deterministic spawn; a dedicated thread
   per run with live, debounced progress (including non-codex roles such as
   planner/reviewer); follow-up messages resume the same session; `stop`/`cancel`
-  terminates.
+  (or Korean `그만`) terminates.
 
 ## Benchmark: solo vs. collaboration
 
@@ -109,7 +109,9 @@ hermes plugins remove agent_company
   "now implement it" (coder), "verify with tests" (tester), "check it for leaks
   before we publish" (reviewer).
 - **Follow up:** reply in the run's thread — it resumes the same session.
-- **Cancel:** send `stop` (or `cancel`) in the thread.
+- **Cancel:** send `stop` in the thread. `cancel`, `!stop`, `!cancel` and the
+  Korean `그만`/`멈춰`/`중단`/`취소` all work. It must be the **whole message** —
+  `stop the dev server` is a follow-up instruction, not a cancel.
 
 ## Orchestrating multiple sub-agents
 
