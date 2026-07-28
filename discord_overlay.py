@@ -106,8 +106,12 @@ async def create_coder_thread(
         from .roles import get_role
         _rec = _db.get_coder_run(coder_run_id)
         _label = get_role(_rec.get("role") if _rec else None).result_label
+        # 취소 방법을 앵커에 같이 적는다. 안 적어두면 사용자가 자연스럽게
+        # 떠오르는 말을 치는데, 인식 못 한 말은 취소가 아니라 코더에게 가는
+        # 지시가 되어 "멈췄습니다" 같은 거짓 확인을 만들어낸다.
         anchor = await channel.send(
-            f"▶ 서브에이전트에게 위임 · {_label} — `{coder_run_id}`"
+            f"▶ 서브에이전트에게 위임 · {_label} — `{coder_run_id}`\n"
+            f"· 멈추려면 이 스레드에 `그만`"
         )
         thread_name = self._make_thread_name(goal)
         thread = await anchor.create_thread(
