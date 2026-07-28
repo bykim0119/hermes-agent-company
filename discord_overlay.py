@@ -589,6 +589,12 @@ def install_discord_coder_overlay() -> None:
     #    to that coder (cancel / follow-up) instead of the main Hermes brain.
     #    on_message is the sole caller and its channel filters run before it
     #    reaches here, so ordering is preserved.
+    #
+    #    hermes >=0.19 returns bool ("did this reach dispatch?"); the missed-
+    #    message recovery sweep re-delivers anything falsy. A coder-routed
+    #    message *was* dispatched — to the coder — so return True, or a
+    #    gateway restart replays follow-ups. Older hermes returns None and
+    #    ignores the value, so True is safe there too.
     _orig_handle_message = DiscordAdapter._handle_message
 
     async def _wrapped_handle_message(self, message, *args, **kwargs):
@@ -599,12 +605,12 @@ def install_discord_coder_overlay() -> None:
                 from .delegate_background import is_cancel_command
                 if is_cancel_command(message.content):
                     await self._cancel_coder_run(_cid, message.channel)
-                    return
+                    return True
                 sessions.touch(_cid)
                 await self._handle_coder_followup(
                     _cid, message.content, message.channel
                 )
-                return
+                return True
         return await _orig_handle_message(self, message, *args, **kwargs)
 
     DiscordAdapter._handle_message = _wrapped_handle_message
