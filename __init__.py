@@ -589,6 +589,62 @@ def _install_discord_coder_overlay() -> None:
     from .discord_overlay import install_discord_coder_overlay
 
     install_discord_coder_overlay()
+    _arm_discord_overlay_on_adapter_create()
+
+
+def _arm_discord_overlay_on_adapter_create() -> None:
+    """Install the overlay when the gateway actually builds the Discord adapter.
+
+    hermes 0.18 made bundled platform plugins *deferred*
+    (``platform_registry.register_deferred``): the adapter module is imported
+    only when something first asks the registry for that platform. Plugin
+    discovery runs long before that, so at ``register(ctx)`` time there is no
+    DiscordAdapter class to wrap — the overlay silently no-ops and ``/code``,
+    coder threads, progress relay and follow-up routing all go missing.
+
+    Rather than force-importing discord.py at discovery (which would undo the
+    laziness hermes just gained, for gateways that don't even run Discord), we
+    wrap ``create_adapter``: on the discord platform we resolve the entry — that
+    runs the deferred loader and imports the module — install the overlay onto
+    the freshly-loaded class, and only then let the factory instantiate. The
+    ``__init__`` wrap therefore applies to that very adapter.
+
+    Idempotent on both ends: the registry wrap is sentinel-guarded, and
+    ``install_discord_coder_overlay`` is itself idempotent.
+    """
+    try:
+        from gateway.platform_registry import platform_registry
+    except Exception:
+        logger.debug(
+            "agent_company: platform_registry unavailable — "
+            "deferred Discord overlay hook skipped (hermes <0.18)"
+        )
+        return
+
+    if getattr(platform_registry, "_agent_company_create_adapter_wrapped", False):
+        return
+
+    _orig_create_adapter = platform_registry.create_adapter
+
+    def _wrapped_create_adapter(name, config, *args, **kwargs):
+        if name == "discord":
+            try:
+                platform_registry.get(name)  # runs the deferred loader
+                from .discord_overlay import install_discord_coder_overlay
+                install_discord_coder_overlay()
+            except Exception:
+                logger.exception(
+                    "agent_company: Discord overlay install failed at adapter "
+                    "creation — the adapter is still created, without coder support"
+                )
+        return _orig_create_adapter(name, config, *args, **kwargs)
+
+    platform_registry.create_adapter = _wrapped_create_adapter
+    platform_registry._agent_company_create_adapter_wrapped = True
+    logger.info(
+        "agent_company: platform_registry.create_adapter wrapped "
+        "for deferred Discord overlay"
+    )
 
 
 def _install_codex_exec_auth() -> None:
